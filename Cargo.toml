@@ -1,0 +1,12 @@
+[package]
+name = "freemacs"
+version = "0.1.0"
+edition = "2024"
+authors = ["Martin Sandiford"]
+license = "GPL-2.0"
+
+[dependencies]
+regex = "1.12.2"
+ncurses = "6.0.1"
+glob = "0.3.3"
+chrono = "0.4.42"
