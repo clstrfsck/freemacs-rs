@@ -223,10 +223,6 @@ impl MintPrim for NxPrim {
 struct LsPrim;
 impl MintPrim for LsPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
         let separator = args[1].value();
         let prefix = args[2].value();
         interp.return_form_list(is_active, separator, prefix);

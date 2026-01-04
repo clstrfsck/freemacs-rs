@@ -278,29 +278,26 @@ impl Mint {
     }
 
     pub fn return_form_list(&mut self, is_active: bool, sep: &MintString, prefix: &MintString) {
-        let mut result = Vec::new();
-
-        if !prefix.is_empty() {
-            let mut need_sep = false;
-
+        let mut form_names: Vec<&MintString> = if !prefix.is_empty() {
             // Collect and sort form names that match prefix
-            let mut matching_forms: Vec<&MintString> = self
+            self
                 .forms
                 .keys()
                 .filter(|name| name.starts_with(prefix))
-                .collect();
-
-            matching_forms.sort();
-
-            for form_name in matching_forms {
-                if need_sep {
-                    result.extend_from_slice(sep);
-                }
-                result.extend_from_slice(form_name);
-                need_sep = true;
+                .collect()
+        } else {
+            self.forms.keys().collect()
+        };
+        form_names.sort();
+        let mut need_sep = false;
+        let mut result = Vec::new();
+        for form_name in form_names {
+            if need_sep {
+                result.extend_from_slice(sep);
             }
+            result.extend_from_slice(form_name);
+            need_sep = true;
         }
-
         self.return_string(is_active, &result);
     }
 

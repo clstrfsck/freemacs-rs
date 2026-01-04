@@ -37,6 +37,7 @@ impl MintPrim for OwPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
         let mut output = self.output.borrow_mut();
         for arg in args.iter().skip(1) {
+            print!("{}", String::from_utf8(arg.value().clone()).unwrap());
             output.extend(String::from_utf8(arg.value().clone()).unwrap().chars());
         }
         interp.return_null(is_active);

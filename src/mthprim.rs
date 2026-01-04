@@ -47,10 +47,6 @@ fn get_base(base_chr: u8, default: i32) -> i32 {
 struct BcPrim;
 impl MintPrim for BcPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 4 {
-            return;
-        }
-
         let arg1 = &args[1];
         let arg2 = &args[2];
         let arg3 = &args[3];
