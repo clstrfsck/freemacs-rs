@@ -135,9 +135,11 @@ impl NeutralString {
     }
 
     fn pop_arguments(&mut self) -> MintArgList {
-        let mut result = Vec::new();
+        // FIXME: This is pretty messy.  Instead of cloning and draining, we
+        // could just split_off the args Vec at last_func.
+        let mut result = MintArgList::new();
         for i in 0..self.last_func {
-            result.insert(0, self.args[i].clone());
+            result.push_front(self.args[i].clone());
         }
 
         self.args.drain(0..self.last_func);

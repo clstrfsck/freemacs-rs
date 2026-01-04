@@ -17,14 +17,15 @@
  */
 
 use freemacs::buffer;
-use freemacs::bufprim;
 use freemacs::emacs_buffers;
 use freemacs::emacs_window;
 use freemacs::emacs_window_curses;
-use freemacs::frmprim;
 use freemacs::gap_buffer;
-use freemacs::libprim;
 use freemacs::mint;
+
+use freemacs::bufprim;
+use freemacs::frmprim;
+use freemacs::libprim;
 use freemacs::mthprim;
 use freemacs::strprim;
 use freemacs::sysprim;

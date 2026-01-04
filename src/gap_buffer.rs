@@ -43,6 +43,14 @@ impl GapBuffer {
         Self::new(BLOCK_SIZE)
     }
 
+    fn free(&self) -> usize {
+        self.topbot - self.bottop
+    }
+
+    fn allocated(&self) -> usize {
+        self.buffer.len()
+    }
+
     fn move_gap_to(&mut self, offset: usize) -> bool {
         if offset == self.bottop {
             return true;
@@ -79,7 +87,6 @@ impl GapBuffer {
         }
     }
 
-    // FIXME: Move to GapBuffer impl
     fn slice<'a>(&'a self, start: usize, end: usize) -> Cow<'a, [MintChar]> {
         if start >= end {
             return Cow::Borrowed(&[]);
@@ -113,14 +120,6 @@ impl GapBuffer {
 }
 
 impl Buffer for GapBuffer {
-    fn free(&self) -> usize {
-        self.topbot - self.bottop
-    }
-
-    fn allocated(&self) -> usize {
-        self.buffer.len()
-    }
-
     fn size(&self) -> usize {
         self.allocated() - self.free()
     }

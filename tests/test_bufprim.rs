@@ -16,16 +16,20 @@
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-use crate::mint_types::{MintChar, MintString};
-use regex::bytes::Regex;
+mod test_mint;
+use test_mint::TestMint;
 
-pub trait Buffer {
-    fn size(&self) -> usize;
-    fn get(&self, offset: usize) -> Option<MintChar>;
-    fn replace(&mut self, offset: usize, n: usize, replacement: &MintString) -> bool;
-    fn erase(&mut self, offset: usize, n: usize) -> bool;
-    fn insert(&mut self, offset: usize, to_insert: &MintString) -> bool;
+//
+// Primitives from bufprim.rs
+//
 
-    fn find_forward(&self, regex: &Regex, start: usize, end: usize) -> Option<(usize, usize)>;
-    fn find_backward(&self, regex: &Regex, start: usize, end: usize) -> Option<(usize, usize)>;
+#[test]
+fn ba_prim() {
+    // Note that the default buffer created by init_buffers is buffer 1.
+    assert_eq!("1", TestMint::new("#(ow,#(ba,-1))").result());
+    assert_eq!("2x3", TestMint::new("#(ow,#(ba)x#(ba,0))").result());
+    assert_eq!(
+        "2x1x1",
+        TestMint::new("#(ow,#(ba)x#(ba,1)x#(ba,-1))").result()
+    );
 }

@@ -16,7 +16,7 @@
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-use crate::emacs_buffers::with_buffers;
+use crate::emacs_buffers::{with_buffers, with_current_buffer};
 use crate::mint::{Mint, MintPrim, MintVar};
 use crate::mint_arg::MintArgList;
 use crate::mint_string::{self, get_int_value};
@@ -40,10 +40,6 @@ use std::io::Write;
 struct BaPrim;
 impl MintPrim for BaPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let whattodo = args[1].get_int_value(10);
         let buf_num = with_buffers(|buffers| {
             if whattodo == 0 {
@@ -66,13 +62,8 @@ impl MintPrim for BaPrim {
 struct IsPrim;
 impl MintPrim for IsPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let string = args[1].value();
-        let success =
-            with_buffers(|buffers| buffers.get_cur_buffer().borrow_mut().insert_string(string));
+        let success = with_current_buffer(|buffer| buffer.insert_string(string));
 
         if success && args.len() > 2 {
             interp.return_string(is_active, args[2].value());
@@ -95,14 +86,8 @@ impl MintPrim for IsPrim {
 struct PmPrim;
 impl MintPrim for PmPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let whattodo = args[1].get_int_value(10);
-        let ok = with_buffers(|buffers| {
-            let buf_rc = buffers.get_cur_buffer();
-            let mut buf = buf_rc.borrow_mut();
+        let ok = with_current_buffer(|buf| {
             if whattodo > 0 {
                 buf.push_temp_marks(whattodo as u32)
             } else if whattodo == 0 {
@@ -149,24 +134,15 @@ impl MintPrim for PmPrim {
 struct SmPrim;
 impl MintPrim for SmPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let user_mark = args[1].value();
         if !user_mark.is_empty() {
-            let mark = if args.len() > 2 && !args[2].value().is_empty() {
-                args[2].value()[0]
-            } else {
+            let mark = if args[2].value().is_empty() {
                 b'.'
+            } else {
+                args[2].value()[0]
             };
 
-            with_buffers(|buffers| {
-                buffers
-                    .get_cur_buffer()
-                    .borrow_mut()
-                    .set_mark(user_mark[0], mark)
-            });
+            with_current_buffer(|buf| buf.set_mark(user_mark[0], mark));
         }
         interp.return_null(is_active);
     }
@@ -181,17 +157,10 @@ impl MintPrim for SmPrim {
 struct SpPrim;
 impl MintPrim for SpPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let marks = args[1].value();
-        with_buffers(|buffers| {
-            buffers
-                .get_cur_buffer()
-                .borrow_mut()
-                .set_point_to_marks(marks)
-        });
+        if !marks.is_empty() {
+            with_current_buffer(|buf| buf.set_point_to_marks(marks));
+        }
         interp.return_null(is_active);
     }
 }
@@ -204,12 +173,10 @@ impl MintPrim for SpPrim {
 struct DmPrim;
 impl MintPrim for DmPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let marks = args[1].value();
-        with_buffers(|buffers| buffers.get_cur_buffer().borrow_mut().delete_to_marks(marks));
+        if !marks.is_empty() {
+            with_current_buffer(|buf| buf.delete_to_marks(marks));
+        }
         interp.return_null(is_active);
     }
 }
@@ -224,15 +191,11 @@ impl MintPrim for DmPrim {
 struct RmPrim;
 impl MintPrim for RmPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let mark = args[1].value();
         if !mark.is_empty() {
-            let s = with_buffers(|buffers| buffers.get_cur_buffer().borrow().read_to_mark(mark[0]));
+            let s = with_current_buffer(|buf| buf.read_to_mark(mark[0]));
             interp.return_string(is_active, &s);
-        } else if args.len() > 2 {
+        } else {
             interp.return_string(true, args[2].value());
         }
     }
@@ -247,13 +210,9 @@ impl MintPrim for RmPrim {
 struct RcPrim;
 impl MintPrim for RcPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let mark = args[1].value();
         let count = if !mark.is_empty() {
-            with_buffers(|buffers| buffers.get_cur_buffer().borrow().chars_to_mark(mark[0]))
+            with_current_buffer(|buf| buf.chars_to_mark(mark[0]))
         } else {
             0
         };
@@ -269,26 +228,20 @@ impl MintPrim for RcPrim {
 struct MbPrim;
 impl MintPrim for MbPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let mark = args[1].value();
         let before = if !mark.is_empty() {
-            with_buffers(|buffers| buffers.get_cur_buffer().borrow().mark_before_point(mark[0]))
+            with_current_buffer(|buf| buf.mark_before_point(mark[0]))
         } else {
             false
         };
 
-        let result = if before && args.len() > 2 {
-            args[2].value().clone()
-        } else if args.len() > 3 {
-            args[3].value().clone()
+        let result = if before {
+            args[2].value()
         } else {
-            MintString::new()
+            args[3].value()
         };
 
-        interp.return_string(is_active, &result);
+        interp.return_string(is_active, result);
     }
 }
 
@@ -301,21 +254,11 @@ impl MintPrim for MbPrim {
 struct RfPrim;
 impl MintPrim for RfPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
-        let file_name = args[1].value();
-        let fn_str = String::from_utf8_lossy(file_name);
+        let fn_str = String::from_utf8_lossy(args[1].value());
 
         match fs::read(&fn_str as &str) {
             Ok(contents) => {
-                with_buffers(|buffers| {
-                    buffers
-                        .get_cur_buffer()
-                        .borrow_mut()
-                        .insert_string(&contents)
-                });
+                with_current_buffer(|buf| buf.insert_string(&contents));
                 interp.return_null(is_active);
             }
             Err(e) => {
@@ -335,25 +278,13 @@ impl MintPrim for RfPrim {
 struct WfPrim;
 impl MintPrim for WfPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
+        let fn_str = String::from_utf8_lossy(args[1].value());
 
-        let file_name = args[1].value();
-        let fn_str = String::from_utf8_lossy(file_name);
-
-        let content = with_buffers(|buffers| {
-            let buf_rc = buffers.get_cur_buffer();
-            let buf = buf_rc.borrow();
-            buf.read_to_mark_from(b']', 0)
-        });
-
+        let content = with_current_buffer(|buf| buf.read_to_mark_from(b']', 0));
         match fs::File::create(&fn_str as &str) {
             Ok(mut file) => match file.write_all(content.as_slice()) {
                 Ok(_) => {
-                    with_buffers(|buffers| {
-                        buffers.get_cur_buffer().borrow_mut().set_modified(false)
-                    });
+                    with_current_buffer(|buf| buf.set_modified(false));
                     interp.return_null(is_active);
                 }
                 Err(e) => {
@@ -377,14 +308,12 @@ impl MintPrim for WfPrim {
 struct PbPrim;
 impl MintPrim for PbPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, _args: &MintArgList) {
-        with_buffers(|buffers| {
-            let buf = buffers.get_cur_buffer();
-            let buf_ref = buf.borrow();
-            eprintln!("Buffer number: {}", buf_ref.get_buf_number());
+        with_current_buffer(|buf| {
+            eprintln!("Buffer number: {}", buf.get_buf_number());
             eprintln!("===== CONTENTS =====");
-            let content = buf_ref.read_to_mark(b'Z');
-            for ch in content.as_slice() {
-                eprint!("{}", *ch as char);
+            let content = buf.read_to_mark_from(b']', 0);
+            for &ch in content.as_slice() {
+                eprint!("{}", ch as char);
             }
             eprintln!("\n=== END CONTENTS ===");
         });
@@ -401,15 +330,10 @@ impl MintPrim for PbPrim {
 struct BiPrim;
 impl MintPrim for BiPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 5 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let buf_num = args[1].get_int_value(10) as u32;
         let mark = args[2].value();
         let success_str = args[3].value();
-        let _failure_str = args[4].value();
+        let failure_str = args[4].value();
 
         let mut success = false;
 
@@ -430,16 +354,14 @@ impl MintPrim for BiPrim {
 
             // Insert into current buffer
             if let Some(text) = text {
-                success = with_buffers(|buffers| {
-                    buffers.get_cur_buffer().borrow_mut().insert_string(&text)
-                });
+                success = with_current_buffer(|buf| buf.insert_string(&text));
             }
         }
 
         if success {
             interp.return_string(is_active, success_str);
         } else {
-            interp.return_null(is_active);
+            interp.return_string(is_active, failure_str);
         }
     }
 }
@@ -490,11 +412,6 @@ impl MintPrim for StPrim {
 struct LpPrim;
 impl MintPrim for LpPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 5 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let pattern = args[1].value();
         let error_str = args[2].value();
         let is_plain = args[3].value().is_empty();
@@ -528,11 +445,6 @@ impl MintPrim for LpPrim {
 struct LkPrim;
 impl MintPrim for LkPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 7 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let mark1 = if args[1].value().is_empty() {
             b'['
         } else {
@@ -577,20 +489,11 @@ impl MintPrim for LkPrim {
 struct TrPrim;
 impl MintPrim for TrPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
         let mark = args[1].value();
         let trstr = args[2].value();
 
         if !mark.is_empty() {
-            with_buffers(|buffers| {
-                buffers
-                    .get_cur_buffer()
-                    .borrow_mut()
-                    .translate(mark[0], trstr)
-            });
+            with_current_buffer(|buf| buf.translate(mark[0], trstr));
         }
         interp.return_null(is_active);
     }
@@ -599,8 +502,8 @@ impl MintPrim for TrPrim {
 struct ClVar;
 impl MintVar for ClVar {
     fn get_val(&self, _interp: &Mint) -> MintString {
-        with_buffers(|buffers| {
-            let line_no = buffers.get_cur_buffer().borrow().get_point_line() + 1;
+        with_current_buffer(|buf| {
+            let line_no = buf.get_point_line() + 1;
             let mut s = MintString::new();
             mint_string::append_num(&mut s, line_no as i32, 10);
             s
@@ -609,9 +512,7 @@ impl MintVar for ClVar {
 
     fn set_val(&self, _interp: &mut Mint, val: &MintString) {
         let line_no = get_int_value(val, 10);
-        with_buffers(|buffers| {
-            let buffer = buffers.get_cur_buffer();
-            let mut buf = buffer.borrow_mut();
+        with_current_buffer(|buf| {
             buf.set_point_line(std::cmp::max(0, line_no - 1) as u32);
         });
     }
@@ -620,8 +521,8 @@ impl MintVar for ClVar {
 struct CsVar;
 impl MintVar for CsVar {
     fn get_val(&self, _interp: &Mint) -> MintString {
-        with_buffers(|buffers| {
-            let col_no = buffers.get_cur_buffer().borrow().get_column() + 1;
+        with_current_buffer(|buf| {
+            let col_no = buf.get_column() + 1;
             let mut s = Vec::new();
             mint_string::append_num(&mut s, col_no as i32, 10);
             s
@@ -631,9 +532,7 @@ impl MintVar for CsVar {
     fn set_val(&self, _interp: &mut Mint, val: &MintString) {
         let col_no = get_int_value(val, 10);
         if col_no > 0 {
-            with_buffers(|buffers| {
-                let buffer = buffers.get_cur_buffer();
-                let mut buf = buffer.borrow_mut();
+            with_current_buffer(|buf| {
                 buf.set_column(col_no as u32 - 1);
             });
         }
@@ -643,15 +542,10 @@ impl MintVar for CsVar {
 struct MbVar;
 impl MintVar for MbVar {
     fn get_val(&self, _interp: &Mint) -> MintString {
-        with_buffers(|buffers| {
-            let cb = buffers.get_cur_buffer();
+        with_current_buffer(|buf| {
             let mut s = Vec::new();
-            let mod_flag = if cb.borrow().is_modified() { 1 } else { 0 };
-            let wp_flag = if cb.borrow().is_write_protected() {
-                2
-            } else {
-                0
-            };
+            let mod_flag = if buf.is_modified() { 1 } else { 0 };
+            let wp_flag = if buf.is_write_protected() { 2 } else { 0 };
             mint_string::append_num(&mut s, mod_flag | wp_flag, 10);
             s
         })
@@ -659,11 +553,9 @@ impl MintVar for MbVar {
 
     fn set_val(&self, _interp: &mut Mint, val: &MintString) {
         let flags = get_int_value(val, 10);
-        with_buffers(|buffers| {
-            let buffer = buffers.get_cur_buffer();
-            let mut cb = buffer.borrow_mut();
-            cb.set_modified((flags & 1) != 0);
-            cb.set_write_protected((flags & 2) != 0);
+        with_current_buffer(|buf| {
+            buf.set_modified((flags & 1) != 0);
+            buf.set_write_protected((flags & 2) != 0);
         });
     }
 }
@@ -671,9 +563,8 @@ impl MintVar for MbVar {
 struct NlVar;
 impl MintVar for NlVar {
     fn get_val(&self, _interp: &Mint) -> MintString {
-        with_buffers(|buffers| {
-            let cb = buffers.get_cur_buffer();
-            let newline_count = cb.borrow().count_newlines_total() as i32;
+        with_current_buffer(|buf| {
+            let newline_count = buf.count_newlines_total() as i32;
             let mut s = Vec::new();
             mint_string::append_num(&mut s, newline_count + 1, 10);
             s
@@ -688,10 +579,9 @@ impl MintVar for NlVar {
 struct PbVar;
 impl MintVar for PbVar {
     fn get_val(&self, _interp: &Mint) -> MintString {
-        with_buffers(|buffers| {
-            let cb = buffers.get_cur_buffer();
-            let point_line = cb.borrow().get_point_line() as i32;
-            let newline_count = cb.borrow().count_newlines_total() as i32;
+        with_current_buffer(|buf| {
+            let point_line = buf.get_point_line() as i32;
+            let newline_count = buf.count_newlines_total() as i32;
             let mut s = Vec::new();
             mint_string::append_num(&mut s, (point_line + 1) * 100 / (newline_count + 1), 10);
             s
@@ -706,9 +596,8 @@ impl MintVar for PbVar {
 struct RsVar;
 impl MintVar for RsVar {
     fn get_val(&self, _interp: &Mint) -> MintString {
-        with_buffers(|buffers| {
-            let cb = buffers.get_cur_buffer();
-            let get_point_row = cb.borrow().get_point_row() as i32;
+        with_current_buffer(|buf| {
+            let get_point_row = buf.get_point_row() as i32;
             let mut s = Vec::new();
             mint_string::append_num(&mut s, get_point_row, 10);
             s
@@ -716,9 +605,8 @@ impl MintVar for RsVar {
     }
 
     fn set_val(&self, _interp: &mut Mint, val: &MintString) {
-        with_buffers(|buffers| {
-            let cb = buffers.get_cur_buffer();
-            cb.borrow_mut().set_point_row(get_int_value(val, 10) as u32);
+        with_current_buffer(|buf| {
+            buf.set_point_row(get_int_value(val, 10) as u32);
         });
     }
 }
@@ -726,9 +614,8 @@ impl MintVar for RsVar {
 struct TcVar;
 impl MintVar for TcVar {
     fn get_val(&self, _interp: &Mint) -> MintString {
-        with_buffers(|buffers| {
-            let cb = buffers.get_cur_buffer();
-            let tab_width = cb.borrow().get_tab_width() as i32;
+        with_current_buffer(|buf| {
+            let tab_width = buf.get_tab_width() as i32;
             let mut s = Vec::new();
             mint_string::append_num(&mut s, tab_width, 10);
             s
@@ -736,9 +623,8 @@ impl MintVar for TcVar {
     }
 
     fn set_val(&self, _interp: &mut Mint, val: &MintString) {
-        with_buffers(|buffers| {
-            let cb = buffers.get_cur_buffer();
-            cb.borrow_mut().set_tab_width(get_int_value(val, 10) as u32);
+        with_current_buffer(|buf| {
+            buf.set_tab_width(get_int_value(val, 10) as u32);
         });
     }
 }

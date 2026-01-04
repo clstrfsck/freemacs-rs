@@ -17,6 +17,14 @@
  */
 
 use crate::mint_types::{MintChar, MintString};
+use std::collections::VecDeque;
+use std::collections::vec_deque::{IntoIter, Iter};
+use std::ops::Index;
+
+const ARG_END: &MintArg = &MintArg {
+    arg_type: ArgType::End,
+    value: Vec::new(),
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArgType {
@@ -84,5 +92,65 @@ impl MintArg {
     }
 }
 
-// FIXME: need something that is efficient to put elements on the front.
-pub type MintArgList = Vec<MintArg>;
+#[derive(Debug, Clone)]
+pub struct MintArgList {
+    args: VecDeque<MintArg>,
+}
+
+impl MintArgList {
+    pub fn new() -> Self {
+        Self {
+            args: VecDeque::new(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.args.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.args.is_empty()
+    }
+
+    pub fn push_front(&mut self, arg: MintArg) {
+        self.args.push_front(arg);
+    }
+
+    pub fn iter(&'_ self) -> Iter<'_, MintArg> {
+        self.args.iter()
+    }
+}
+
+impl Default for MintArgList {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Index<usize> for MintArgList {
+    type Output = MintArg;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index < self.args.len() {
+            &self.args[index]
+        } else {
+            ARG_END
+        }
+    }
+}
+
+impl IntoIterator for MintArgList {
+    type Item = MintArg;
+    type IntoIter = IntoIter<MintArg>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.args.into_iter()
+    }
+}
+
+impl FromIterator<MintArg> for MintArgList {
+    fn from_iter<I: IntoIterator<Item = MintArg>>(iter: I) -> Self {
+        let args: VecDeque<MintArg> = iter.into_iter().collect();
+        Self { args }
+    }
+}

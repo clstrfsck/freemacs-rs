@@ -23,6 +23,9 @@ use regex::bytes::{Regex, RegexBuilder};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static S_BUFNO: AtomicUsize = AtomicUsize::new(1);
 
 pub struct EmacsBuffers {
     buffer_factory: fn() -> Box<dyn Buffer>,
@@ -33,17 +36,16 @@ pub struct EmacsBuffers {
 
 impl EmacsBuffers {
     pub fn new(factory: fn() -> Box<dyn Buffer>) -> Self {
-        let mut buffers = Self {
+        let bufno = S_BUFNO.fetch_add(1, Ordering::SeqCst) as MintCount;
+        let init_buffer = Rc::new(RefCell::new(EmacsBuffer::new(bufno, factory())));
+        let mut buffers = HashMap::new();
+        buffers.insert(bufno, Rc::clone(&init_buffer));
+        Self {
             buffer_factory: factory,
-            current_buffer: Rc::new(RefCell::new(EmacsBuffer::new(factory()))),
-            buffers: HashMap::new(),
+            current_buffer: Rc::clone(&init_buffer),
+            buffers,
             regex: None,
-        };
-        let bufno = buffers.current_buffer.borrow().get_buf_number();
-        buffers
-            .buffers
-            .insert(bufno, Rc::clone(&buffers.current_buffer));
-        buffers
+        }
     }
 
     pub fn get_cur_buffer(&self) -> Rc<RefCell<EmacsBuffer>> {
@@ -52,7 +54,8 @@ impl EmacsBuffers {
 
     pub fn new_buffer(&mut self) -> MintCount {
         let new_buffer = (self.buffer_factory)();
-        self.current_buffer = Rc::new(RefCell::new(EmacsBuffer::new(new_buffer)));
+        let bufno = S_BUFNO.fetch_add(1, Ordering::SeqCst) as MintCount;
+        self.current_buffer = Rc::new(RefCell::new(EmacsBuffer::new(bufno, new_buffer)));
         let bufno = self.current_buffer.borrow().get_buf_number();
         self.buffers.insert(bufno, Rc::clone(&self.current_buffer));
         bufno
@@ -195,6 +198,7 @@ pub fn free_buffers() {
     EMACS_BUFFERS.with(|buffers| {
         *buffers.borrow_mut() = None;
     });
+    S_BUFNO.store(1, Ordering::SeqCst);
 }
 
 pub fn with_buffers<F, R>(f: F) -> R

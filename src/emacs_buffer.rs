@@ -20,9 +20,6 @@ use crate::buffer::Buffer;
 use crate::mint_types::{MintChar, MintCount, MintString};
 use regex::bytes::Regex;
 use std::cmp::{max, min};
-use std::sync::atomic::{AtomicUsize, Ordering};
-
-static S_BUFNO: AtomicUsize = AtomicUsize::new(1);
 
 pub const EOLCHAR: MintChar = b'\n';
 
@@ -69,9 +66,7 @@ pub struct EmacsBuffer {
 }
 
 impl EmacsBuffer {
-    pub fn new(text: Box<dyn Buffer>) -> Self {
-        let bufno = S_BUFNO.fetch_add(1, Ordering::SeqCst) as MintCount;
-
+    pub fn new(bufno: MintCount, text: Box<dyn Buffer>) -> Self {
         Self {
             wp: false,
             modified: false,
@@ -177,10 +172,6 @@ impl EmacsBuffer {
     }
 
     pub fn delete_to_marks(&mut self, marks: &MintString) -> bool {
-        if marks.is_empty() {
-            return true;
-        }
-
         for &mark in marks {
             if !self.delete_to_mark(mark) {
                 return false;
@@ -617,7 +608,7 @@ impl EmacsBuffer {
     }
 
     pub fn set_point_to_marks(&mut self, marks: &MintString) {
-        if let Some(&mark) = marks.first() {
+        for &mark in marks {
             self.set_point_to_mark(mark);
         }
     }

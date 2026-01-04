@@ -17,7 +17,7 @@
  */
 
 use crate::mint::{Mint, MintPrim};
-use crate::mint_arg::{MintArg, MintArgList};
+use crate::mint_arg::MintArgList;
 
 // #(ds,X,Y)
 // ---------
@@ -62,7 +62,7 @@ impl MintPrim for GsPrim {
         let param_args: MintArgList = if args.len() > 2 {
             args.iter().skip(2).cloned().collect()
         } else {
-            vec![MintArg::new(crate::mint_arg::ArgType::End)]
+            MintArgList::default()
         };
 
         // Get form and expand with parameters
