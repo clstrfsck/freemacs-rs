@@ -18,12 +18,11 @@ I feel like now, at the beginning of 2026, that it is time to re-implement
 in Rust.
 
 This is the initial Rust version.  There is quite a bit of stuff implemented,
-but not yet complete enough to load and compile the `*.min` editor files.
+and is complete enough to load and compile the `*.min` editor files.  There are
+not enough tests, but hopefully this will be improved over time.
 
-If you want something that actually works right now, the C++
-[Freemacs](https://github.com/clstrfsck/Freemacs) code is what you want.
-Hopefully in the next few weeks there will be enough of this working that
-the C++ code will be unnecessary.
+The C++ version, which this version is largely on-par with, is available at
+[Freemacs](https://github.com/clstrfsck/Freemacs) if you prefer.
 
 ## Installing
 
@@ -32,9 +31,19 @@ I think the rest you should be able to work out from `Cargo.toml`.
 
 Once you have an executable, you will need to compile the MINT files.  This is
 most easily accomplished by navigating into the "Editor" directory and executing
-the compiled Freemacs.  This does not work right now for the Rust version.
+the compiled Freemacs.
 
 There is no real install process beyond this.
+
+## Running
+
+Note that the debug version outputs quite a bit of debugging information on
+stderr.  This makes it possible to capture the debug information and run the
+editor in a useable way by doing something like:
+
+```sh
+target/debug/freemacs some_file.txt 2>capture.txt
+```
 
 ## License
 
