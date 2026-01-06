@@ -16,16 +16,25 @@
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-use crate::mint_types::{MintChar, MintString};
+use crate::mint_types::{MintChar, MintCount, MintString};
 use regex::bytes::Regex;
 
 pub trait Buffer {
-    fn size(&self) -> usize;
-    fn get(&self, offset: usize) -> Option<MintChar>;
-    fn replace(&mut self, offset: usize, n: usize, replacement: &MintString) -> bool;
-    fn erase(&mut self, offset: usize, n: usize) -> bool;
-    fn insert(&mut self, offset: usize, to_insert: &MintString) -> bool;
-
-    fn find_forward(&self, regex: &Regex, start: usize, end: usize) -> Option<(usize, usize)>;
-    fn find_backward(&self, regex: &Regex, start: usize, end: usize) -> Option<(usize, usize)>;
+    fn size(&self) -> MintCount;
+    fn get(&self, offset: MintCount) -> Option<MintChar>;
+    fn replace(&mut self, offset: MintCount, n: MintCount, replacement: &MintString) -> bool;
+    fn erase(&mut self, offset: MintCount, n: MintCount) -> bool;
+    fn insert(&mut self, offset: MintCount, to_insert: &MintString) -> bool;
+    fn find_forward(
+        &self,
+        regex: &Regex,
+        start: MintCount,
+        end: MintCount,
+    ) -> Option<(MintCount, MintCount)>;
+    fn find_backward(
+        &self,
+        regex: &Regex,
+        start: MintCount,
+        end: MintCount,
+    ) -> Option<(MintCount, MintCount)>;
 }

@@ -109,8 +109,7 @@ impl EmacsBuffer {
             return false;
         }
 
-        let insert_pos = self.point as usize;
-        if !self.text.insert(insert_pos, s) {
+        if !self.text.insert(self.point, s) {
             return false;
         }
 
@@ -196,7 +195,7 @@ impl EmacsBuffer {
 
         let newline_count = self.count_newlines(min_pos, max_pos);
 
-        if !self.text.erase(min_pos as usize, delete_len as usize) {
+        if !self.text.erase(min_pos, delete_len) {
             return false;
         }
 
@@ -226,7 +225,7 @@ impl EmacsBuffer {
 
         let mut result = Vec::new();
         for i in min_pos..max_pos {
-            if let Some(ch) = self.text.get(i as usize) {
+            if let Some(ch) = self.text.get(i) {
                 result.push(ch);
             }
         }
@@ -248,12 +247,12 @@ impl EmacsBuffer {
 
         let mut changed = false;
         for pos in min_pos..max_pos {
-            if let Some(ch) = self.text.get(pos as usize)
+            if let Some(ch) = self.text.get(pos)
                 && let Some(idx) = from_str.iter().position(|&c| c == ch)
                 && idx < to_str.len()
             {
                 let replacement = vec![to_str[idx]];
-                self.text.replace(pos as usize, 1, &replacement);
+                self.text.replace(pos, 1, &replacement);
                 changed = true;
             }
         }
@@ -381,7 +380,7 @@ impl EmacsBuffer {
         let mut pos = bol;
 
         while pos < eol && cur_col < col {
-            if let Some(ch) = self.text.get(pos as usize) {
+            if let Some(ch) = self.text.get(pos) {
                 cur_col += self.char_width(cur_col, ch);
                 pos += 1;
             } else {
@@ -394,7 +393,7 @@ impl EmacsBuffer {
     pub fn count_newlines(&self, from: MintCount, to: MintCount) -> MintCount {
         let mut count = 0;
         for i in from..to {
-            if let Some(ch) = self.text.get(i as usize)
+            if let Some(ch) = self.text.get(i)
                 && ch == EOLCHAR
             {
                 count += 1;
@@ -406,7 +405,7 @@ impl EmacsBuffer {
     pub fn count_columns(&self, from: MintCount, to: MintCount) -> MintCount {
         let mut col = 0;
         for i in from..to {
-            if let Some(ch) = self.text.get(i as usize) {
+            if let Some(ch) = self.text.get(i) {
                 col += self.char_width(col, ch);
             }
         }
@@ -507,7 +506,7 @@ impl EmacsBuffer {
         let mut pos = frompos;
         while pos > 0 {
             pos -= 1;
-            if let Some(ch) = self.text.get(pos as usize)
+            if let Some(ch) = self.text.get(pos)
                 && ch == EOLCHAR
             {
                 return pos + 1;
@@ -520,7 +519,7 @@ impl EmacsBuffer {
         let size = self.text.size() as MintCount;
         let mut pos = frompos;
         while pos < size {
-            if let Some(ch) = self.text.get(pos as usize)
+            if let Some(ch) = self.text.get(pos)
                 && ch == EOLCHAR
             {
                 return pos;
@@ -534,7 +533,7 @@ impl EmacsBuffer {
         let mut pos = frompos;
         while pos > 0 {
             pos -= 1;
-            if let Some(ch) = self.text.get(pos as usize)
+            if let Some(ch) = self.text.get(pos)
                 && ch.is_ascii_whitespace()
             {
                 return pos;
@@ -547,7 +546,7 @@ impl EmacsBuffer {
         let size = self.text.size() as MintCount;
         let mut pos = frompos;
         while pos < size {
-            if let Some(ch) = self.text.get(pos as usize)
+            if let Some(ch) = self.text.get(pos)
                 && ch.is_ascii_whitespace()
             {
                 return pos;
@@ -561,7 +560,7 @@ impl EmacsBuffer {
         let mut pos = frompos;
         while pos > 0 {
             pos -= 1;
-            if let Some(ch) = self.text.get(pos as usize)
+            if let Some(ch) = self.text.get(pos)
                 && !ch.is_ascii_whitespace()
             {
                 return pos;
@@ -574,7 +573,7 @@ impl EmacsBuffer {
         let size = self.text.size() as MintCount;
         let mut pos = frompos;
         while pos < size {
-            if let Some(ch) = self.text.get(pos as usize)
+            if let Some(ch) = self.text.get(pos)
                 && !ch.is_ascii_whitespace()
             {
                 return pos;
@@ -613,11 +612,21 @@ impl EmacsBuffer {
         }
     }
 
-    pub fn find_forward(&self, regex: &Regex, start: usize, end: usize) -> Option<(usize, usize)> {
+    pub fn find_forward(
+        &self,
+        regex: &Regex,
+        start: MintCount,
+        end: MintCount,
+    ) -> Option<(MintCount, MintCount)> {
         self.text.find_forward(regex, start, end)
     }
 
-    pub fn find_backward(&self, regex: &Regex, start: usize, end: usize) -> Option<(usize, usize)> {
+    pub fn find_backward(
+        &self,
+        regex: &Regex,
+        start: MintCount,
+        end: MintCount,
+    ) -> Option<(MintCount, MintCount)> {
         self.text.find_backward(regex, start, end)
     }
 }

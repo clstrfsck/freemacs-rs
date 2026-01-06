@@ -162,7 +162,7 @@ impl EmacsBuffers {
     ) -> bool {
         self.regex
             .as_ref()
-            .and_then(|re| buf.find_forward(re, ss_n as usize, se_n as usize))
+            .and_then(|re| buf.find_forward(re, ss_n, se_n))
             .map(|(match_start, match_end)| {
                 if cfg!(debug_assertions) {
                     eprintln!(
@@ -173,10 +173,10 @@ impl EmacsBuffers {
                     );
                 }
                 if ms != 0 {
-                    buf.set_mark_position(ms, match_start as MintCount);
+                    buf.set_mark_position(ms, match_start);
                 }
                 if me != 0 {
-                    buf.set_mark_position(me, match_end as MintCount);
+                    buf.set_mark_position(me, match_end);
                 }
                 true
             })
@@ -193,13 +193,13 @@ impl EmacsBuffers {
     ) -> bool {
         self.regex
             .as_ref()
-            .and_then(|re| buf.find_backward(re, ss_n as usize, se_n as usize))
+            .and_then(|re| buf.find_backward(re, ss_n, se_n))
             .map(|(match_start, match_end)| {
                 if ms != 0 {
-                    buf.set_mark_position(ms, match_start as MintCount);
+                    buf.set_mark_position(ms, match_start);
                 }
                 if me != 0 {
-                    buf.set_mark_position(me, match_end as MintCount);
+                    buf.set_mark_position(me, match_end);
                 }
                 true
             })

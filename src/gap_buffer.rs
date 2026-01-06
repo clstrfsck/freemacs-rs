@@ -17,25 +17,26 @@
  */
 
 use crate::buffer::Buffer;
-use crate::mint_types::{MintChar, MintString};
+use crate::mint_types::{MintChar, MintCount, MintString};
 use regex::bytes::Regex;
 use std::borrow::Cow;
+use std::ops::Range;
 
-const BLOCK_SIZE: usize = 65536;
+const BLOCK_SIZE: MintCount = 65536;
 
 #[derive(Debug)]
 pub struct GapBuffer {
-    bottop: usize,
-    topbot: usize,
+    bottop: MintCount,
+    topbot: MintCount,
     buffer: Vec<MintChar>,
 }
 
 impl GapBuffer {
-    pub fn new(size: usize) -> Self {
+    pub fn new(size: MintCount) -> Self {
         Self {
             bottop: 0,
             topbot: size,
-            buffer: vec![0; size],
+            buffer: vec![0; size as usize],
         }
     }
 
@@ -43,15 +44,26 @@ impl GapBuffer {
         Self::new(BLOCK_SIZE)
     }
 
-    fn free(&self) -> usize {
+    fn free(&self) -> MintCount {
         self.topbot - self.bottop
     }
 
-    fn allocated(&self) -> usize {
-        self.buffer.len()
+    fn allocated(&self) -> MintCount {
+        self.buffer.len() as MintCount
     }
 
-    fn move_gap_to(&mut self, offset: usize) -> bool {
+    fn resize(&mut self, size: MintCount, fill: MintChar) {
+        self.buffer.resize(size as usize, fill);
+    }
+
+    fn copy_within(&mut self, src_range: Range<MintCount>, dest_start: MintCount) {
+        let src_start = src_range.start as usize;
+        let src_end = src_range.end as usize;
+        let dest_start = dest_start as usize;
+        self.buffer.copy_within(src_start..src_end, dest_start);
+    }
+
+    fn move_gap_to(&mut self, offset: MintCount) -> bool {
         if offset == self.bottop {
             return true;
         }
@@ -61,46 +73,44 @@ impl GapBuffer {
 
         if offset < self.bottop {
             let move_size = self.bottop - offset;
-            self.buffer
-                .copy_within(offset..offset + move_size, self.topbot - move_size);
+            self.copy_within(offset..offset + move_size, self.topbot - move_size);
             self.bottop -= move_size;
             self.topbot -= move_size;
         } else {
             let move_size = offset - self.bottop;
-            self.buffer
-                .copy_within(self.topbot..self.topbot + move_size, self.bottop);
+            self.copy_within(self.topbot..self.topbot + move_size, self.bottop);
             self.bottop += move_size;
             self.topbot += move_size;
         }
         true // offset - (offset - self.bottop) = self.
     }
 
-    fn expand(&mut self, extra_space: usize) {
+    fn expand(&mut self, extra_space: MintCount) {
         if extra_space > 0 {
             let additional_blocks = (extra_space + BLOCK_SIZE) / BLOCK_SIZE;
             let new_size = self.allocated() + additional_blocks * BLOCK_SIZE;
             if new_size > self.allocated() {
                 self.move_gap_to(self.size());
-                self.buffer.resize(new_size, 0);
+                self.resize(new_size, 0);
                 self.topbot = new_size;
             }
         }
     }
 
-    fn slice<'a>(&'a self, start: usize, end: usize) -> Cow<'a, [MintChar]> {
+    fn slice<'a>(&'a self, start: MintCount, end: MintCount) -> Cow<'a, [MintChar]> {
         if start >= end {
             return Cow::Borrowed(&[]);
         }
 
         // Entirely in top contiguous region
         if end <= self.bottop {
-            return Cow::Borrowed(&self.buffer[start..end]);
+            return Cow::Borrowed(&self.buffer[start as usize..end as usize]);
         }
 
         // Entirely in bottom contiguous region (adjust for gap)
         if start >= self.bottop {
-            let actual_start = start + self.free();
-            let actual_end = actual_start + (end - start);
+            let actual_start = start as usize + self.free() as usize;
+            let actual_end = actual_start + (end - start) as usize;
             return Cow::Borrowed(&self.buffer[actual_start..actual_end]);
         }
 
@@ -109,7 +119,7 @@ impl GapBuffer {
         // the way and always return a slice directly.
         // Even better would be regex support for gap-spanning searches without
         // moving the gap.
-        let mut v = Vec::with_capacity(end - start);
+        let mut v = Vec::with_capacity(end as usize - start as usize);
         for i in start..end {
             if let Some(ch) = self.get(i) {
                 v.push(ch);
@@ -120,11 +130,11 @@ impl GapBuffer {
 }
 
 impl Buffer for GapBuffer {
-    fn size(&self) -> usize {
+    fn size(&self) -> MintCount {
         self.allocated() - self.free()
     }
 
-    fn get(&self, offset: usize) -> Option<MintChar> {
+    fn get(&self, offset: MintCount) -> Option<MintChar> {
         if offset >= self.size() {
             return None;
         }
@@ -133,14 +143,14 @@ impl Buffer for GapBuffer {
         } else {
             offset
         };
-        Some(self.buffer[actual_offset])
+        Some(self.buffer[actual_offset as usize])
     }
 
-    fn replace(&mut self, offset: usize, n: usize, replacement: &MintString) -> bool {
+    fn replace(&mut self, offset: MintCount, n: MintCount, replacement: &MintString) -> bool {
         self.erase(offset, n) && self.insert(offset, replacement)
     }
 
-    fn erase(&mut self, offset: usize, n: usize) -> bool {
+    fn erase(&mut self, offset: MintCount, n: MintCount) -> bool {
         if self.size() >= offset && self.size() - offset >= n && self.move_gap_to(offset + n) {
             self.bottop -= n;
             true
@@ -149,33 +159,49 @@ impl Buffer for GapBuffer {
         }
     }
 
-    fn insert(&mut self, offset: usize, to_insert: &MintString) -> bool {
+    fn insert(&mut self, offset: MintCount, to_insert: &MintString) -> bool {
         let insert_size = to_insert.len();
-        if self.free() < insert_size {
-            self.expand(insert_size - self.free());
+        if (self.free() as usize) < insert_size {
+            self.expand(insert_size as MintCount - self.free());
         }
-        if self.free() >= insert_size && self.move_gap_to(offset) {
-            self.buffer[self.bottop..self.bottop + insert_size].copy_from_slice(to_insert);
-            self.bottop += insert_size;
+        if (self.free() as usize) >= insert_size && self.move_gap_to(offset) {
+            let bottop_usize = self.bottop as usize;
+            self.buffer[bottop_usize..bottop_usize + insert_size].copy_from_slice(to_insert);
+            self.bottop += insert_size as MintCount;
             true
         } else {
             false
         }
     }
 
-    fn find_forward(&self, regex: &Regex, start: usize, end: usize) -> Option<(usize, usize)> {
+    fn find_forward(
+        &self,
+        regex: &Regex,
+        start: MintCount,
+        end: MintCount,
+    ) -> Option<(MintCount, MintCount)> {
         let slice = self.slice(start, end);
-        regex
-            .find(&slice)
-            .map(|matched| (start + matched.start(), start + matched.end()))
+        regex.find(&slice).map(|matched| {
+            (
+                start + matched.start() as MintCount,
+                start + matched.end() as MintCount,
+            )
+        })
     }
 
-    fn find_backward(&self, regex: &Regex, start: usize, end: usize) -> Option<(usize, usize)> {
+    fn find_backward(
+        &self,
+        regex: &Regex,
+        start: MintCount,
+        end: MintCount,
+    ) -> Option<(MintCount, MintCount)> {
         let slice = self.slice(start, end);
-        regex
-            .find_iter(&slice)
-            .last()
-            .map(|matched| (start + matched.start(), start + matched.end()))
+        regex.find_iter(&slice).last().map(|matched| {
+            (
+                start + matched.start() as MintCount,
+                start + matched.end() as MintCount,
+            )
+        })
     }
 }
 
