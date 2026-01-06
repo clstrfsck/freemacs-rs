@@ -216,13 +216,12 @@ impl Mint {
     }
 
     pub fn get_var(&self, var_name: &MintString) -> MintString {
-        let var = self.vars
-            .get(var_name)
-            .map(|v| v.get_val(self));
-        if cfg!(debug_assertions) {
-            if var.is_none() {
-                eprintln!("Can't find variable '{:?}' while reading", String::from_utf8_lossy(var_name));
-            }
+        let var = self.vars.get(var_name).map(|v| v.get_val(self));
+        if cfg!(debug_assertions) && var.is_none() {
+            eprintln!(
+                "Can't find variable '{:?}' while reading",
+                String::from_utf8_lossy(var_name)
+            );
         }
         var.unwrap_or_default()
     }
@@ -231,19 +230,29 @@ impl Mint {
         if let Some(var) = self.vars.get(var_name).cloned() {
             var.set_val(self, val);
         } else if cfg!(debug_assertions) {
-            eprintln!("Can't find variable '{:?}' while writing", String::from_utf8_lossy(var_name));
+            eprintln!(
+                "Can't find variable '{:?}' while writing",
+                String::from_utf8_lossy(var_name)
+            );
         }
     }
 
     pub fn return_null(&self, _is_active: bool) {
         if cfg!(debug_assertions) {
-            eprintln!("** Function ({}) returned null string", if _is_active { "A" } else { "N" });
+            eprintln!(
+                "** Function ({}) returned null string",
+                if _is_active { "A" } else { "N" }
+            );
         }
     }
 
     pub fn return_string(&mut self, is_active: bool, s: &MintString) {
         if cfg!(debug_assertions) {
-            eprintln!("** Function ({}) returned: {}", if is_active { "A" } else { "N" }, String::from_utf8_lossy(s));
+            eprintln!(
+                "** Function ({}) returned: {}",
+                if is_active { "A" } else { "N" },
+                String::from_utf8_lossy(s)
+            );
         }
         if is_active {
             self.active_string.push_front(s);
@@ -292,8 +301,7 @@ impl Mint {
     pub fn return_form_list(&mut self, is_active: bool, sep: &MintString, prefix: &MintString) {
         let mut form_names: Vec<&MintString> = if !prefix.is_empty() {
             // Collect and sort form names that match prefix
-            self
-                .forms
+            self.forms
                 .keys()
                 .filter(|name| name.starts_with(prefix))
                 .collect()
@@ -346,7 +354,8 @@ impl Mint {
     }
 
     pub fn set_form_value(&mut self, form_name: &MintString, value: &MintString) {
-        self.forms.insert(form_name.clone(), MintForm::from_string(value));
+        self.forms
+            .insert(form_name.clone(), MintForm::from_string(value));
     }
 
     pub fn scan(&mut self) {
@@ -458,9 +467,18 @@ impl Mint {
 
         if self.prims.contains_key(&func_name) {
             if cfg!(debug_assertions) {
-                eprintln!("Execute function: {} with {} arguments", String::from_utf8_lossy(&func_name), args.len() - 1);
+                eprintln!(
+                    "Execute function: {} with {} arguments",
+                    String::from_utf8_lossy(&func_name),
+                    args.len() - 1
+                );
                 for (argn, arg) in args.iter().enumerate().skip(1) {
-                    eprintln!("  Arg {} ({}): {}", argn, arg.arg_type() as u8, String::from_utf8_lossy(&arg.value()));
+                    eprintln!(
+                        "  Arg {} ({}): {}",
+                        argn,
+                        arg.arg_type() as u8,
+                        String::from_utf8_lossy(arg.value())
+                    );
                 }
             }
             let prim = self.prims.get(&func_name).unwrap().clone();
@@ -478,10 +496,15 @@ impl Mint {
                 eprintln!(
                     "Execute function: {} with {} arguments",
                     String::from_utf8_lossy(&func_name),
-                     args.len() - 1
+                    args.len() - 1
                 );
                 for (argn, arg) in args.iter().enumerate().skip(1) {
-                    eprintln!("  Arg {} ({}): {}", argn, arg.arg_type() as u8, String::from_utf8_lossy(&arg.value()));
+                    eprintln!(
+                        "  Arg {} ({}): {}",
+                        argn,
+                        arg.arg_type() as u8,
+                        String::from_utf8_lossy(arg.value())
+                    );
                 }
             }
             if let Some(form) = self.forms.get(form_name) {
