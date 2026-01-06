@@ -29,11 +29,6 @@ use crate::mint_types::MintString;
 struct LvPrim;
 impl MintPrim for LvPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let var_name = args[1].value();
         let value = interp.get_var(var_name);
         interp.return_string(is_active, &value);
@@ -48,10 +43,6 @@ impl MintPrim for LvPrim {
 struct SvPrim;
 impl MintPrim for SvPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
         let var_name = args[1].value();
         let value = args[2].value();
         interp.set_var(var_name, value);

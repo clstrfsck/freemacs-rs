@@ -33,12 +33,6 @@ use crate::mint_types::MintString;
 struct ItPrim;
 impl MintPrim for ItPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            let timeout_str = b"Timeout".to_vec();
-            interp.return_string(is_active, &timeout_str);
-            return;
-        }
-
         let timeout = args[1].get_int_value(10) * 10; // Hundredths to millis
         let key = emacs_window::with_window(|w| w.get_input(timeout as u32));
         interp.return_string(is_active, &key);
@@ -75,33 +69,15 @@ impl MintPrim for OwPrim {
 struct AnPrim;
 impl MintPrim for AnPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
-        let left = if args.len() > 1 {
-            args[1].value().clone()
-        } else {
-            Vec::new()
-        };
-
-        let flag = if args.len() > 2 {
-            args[2].value().clone()
-        } else {
-            Vec::new()
-        };
-
-        let right = if args.len() > 3 {
-            args[3].value().clone()
-        } else {
-            Vec::new()
-        };
+        let left = args[1].value();
+        let flag = args[2].value();
+        let right = args[3].value();
 
         emacs_window::with_window(|w| {
             if flag.is_empty() {
-                w.announce(&left, &right);
+                w.announce(left, right);
             } else {
-                w.announce_win(&left, &right);
+                w.announce_win(left, right);
             }
         });
 
@@ -118,10 +94,6 @@ impl MintPrim for AnPrim {
 struct XyPrim;
 impl MintPrim for XyPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
         let x = args[1].get_int_value(10);
         let y = args[2].get_int_value(10);
 
@@ -140,10 +112,6 @@ impl MintPrim for XyPrim {
 struct BlPrim;
 impl MintPrim for BlPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
         let freq = args[1].get_int_value(10);
         let millis = args[2].get_int_value(10) * 56; // 18ths of second to millis
 
@@ -168,11 +136,7 @@ impl MintPrim for BlPrim {
 struct RdPrim;
 impl MintPrim for RdPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        let force = if args.len() > 1 {
-            !args[1].is_empty()
-        } else {
-            false
-        };
+        let force = !args[1].is_empty();
 
         with_current_buffer(|buf| {
             emacs_window::with_window(|w| w.redisplay(buf, force));

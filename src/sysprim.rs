@@ -33,11 +33,6 @@ use std::time::SystemTime;
 struct AbPrim;
 impl MintPrim for AbPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let path_str = args[1].value();
         let path = String::from_utf8_lossy(path_str);
         let path_buf = PathBuf::from(path.as_ref());
@@ -98,11 +93,6 @@ impl MintPrim for HlPrim {
 struct CtPrim;
 impl MintPrim for CtPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let file_name = args[1].value();
 
         let result = if file_name.is_empty() {
@@ -158,11 +148,6 @@ impl MintPrim for CtPrim {
 struct FfPrim;
 impl MintPrim for FfPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let pattern = args[1].value();
         let separator = args[2].value();
         let pattern_str = String::from_utf8_lossy(pattern);
@@ -191,11 +176,6 @@ impl MintPrim for FfPrim {
 struct RnPrim;
 impl MintPrim for RnPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let from_name = args[1].value();
         let to_name = args[2].value();
         let from_str = String::from_utf8_lossy(from_name);
@@ -218,11 +198,6 @@ impl MintPrim for RnPrim {
 struct DePrim;
 impl MintPrim for DePrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let file_name = args[1].value();
         let file_str = String::from_utf8_lossy(file_name);
 
@@ -260,31 +235,36 @@ impl EvPrim {
     }
 }
 
+const ENV_SWITCHAR: &[u8] = b"env.SWITCHAR";
+const SWITCHAR: &[u8] = b"-";
+const ENV_SCREEN: &[u8] = b"env.SCREEN";
+const ENV_FULLPATH: &[u8] = b"env.FULLPATH";
+const ENV_RUNLINE: &[u8] = b"env.RUNLINE";
+
 impl MintPrim for EvPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, _args: &MintArgList) {
         // Set switch character
-        interp.set_form_value(b"env.SWITCHAR".to_vec(), b"-".to_vec());
+        interp.set_form_value(&ENV_SWITCHAR.to_vec(), &SWITCHAR.to_vec());
 
         // Set screen (empty - not available)
-        interp.set_form_value(b"env.SCREEN".to_vec(), Vec::new());
+        interp.set_form_value(&ENV_SCREEN.to_vec(), &Vec::new());
 
         // Set full path and run line
         if !self.argv.is_empty() {
-            interp.set_form_value(b"env.FULLPATH".to_vec(), self.argv[0].as_bytes().to_vec());
-
+            interp.set_form_value(&ENV_FULLPATH.to_vec(), &self.argv[0].as_bytes().to_vec());
             let mut runline = Vec::new();
             for arg in self.argv.iter().skip(1) {
                 runline.extend_from_slice(arg.as_bytes());
                 runline.push(b' ');
             }
-            interp.set_form_value(b"env.RUNLINE".to_vec(), runline);
+            interp.set_form_value(&ENV_RUNLINE.to_vec(), &runline);
         }
 
         // Set environment variables
         for (key, value) in &self.envp {
             let mut form_name = b"env.".to_vec();
             form_name.extend_from_slice(key.as_bytes());
-            interp.set_form_value(form_name, value.as_bytes().to_vec());
+            interp.set_form_value(&form_name, &value.as_bytes().to_vec());
         }
 
         interp.return_null(is_active);
@@ -347,7 +327,8 @@ impl MintVar for CnVar {
         let result = {
             use std::process::Command;
             if let Ok(output) = Command::new("uname").arg("-sr").output() {
-                output.stdout
+                let s = String::from_utf8_lossy(&output.stdout).to_string();
+                s.trim().as_bytes().to_vec()
             } else {
                 b"Unknown".to_vec()
             }

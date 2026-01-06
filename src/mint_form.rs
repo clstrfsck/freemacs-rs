@@ -26,9 +26,9 @@ pub struct MintForm {
 }
 
 impl MintForm {
-    pub fn from_string(s: MintString) -> Self {
+    pub fn from_string(s: &MintString) -> Self {
         Self {
-            content: s,
+            content: s.clone(),
             index: 0,
         }
     }

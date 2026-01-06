@@ -100,6 +100,7 @@ impl EmacsBuffers {
         let exp_str = String::from_utf8_lossy(exp);
         match RegexBuilder::new(&exp_str)
             .case_insensitive(fold_case)
+            .multi_line(true)
             .build()
         {
             Ok(re) => {
@@ -117,6 +118,9 @@ impl EmacsBuffers {
         let mut buf = self.current_buffer.borrow_mut();
 
         if self.regex.is_none() {
+            if cfg!(debug_assertions) {
+                eprintln!("Search called with no search string set");
+            }
             if ms != 0 {
                 buf.set_mark(ms, crate::emacs_buffer::MARK_POINT);
             }
@@ -128,6 +132,18 @@ impl EmacsBuffers {
 
         let ss_n = buf.get_mark_position(ss).min(buf.size());
         let se_n = buf.get_mark_position(se).min(buf.size());
+
+        if cfg!(debug_assertions) {
+            eprintln!(
+                "Search in buffer {} for {:?} from {} ({}) to {} ({})",
+                buf.get_buf_number(),
+                self.regex.as_ref().unwrap(),
+                ss as char,
+                ss_n,
+                se as char,
+                se_n
+            );
+        }
 
         if ss_n <= se_n {
             self.search_forward(&mut buf, ss_n, se_n, ms, me)
@@ -148,11 +164,19 @@ impl EmacsBuffers {
             .as_ref()
             .and_then(|re| buf.find_forward(re, ss_n as usize, se_n as usize))
             .map(|(match_start, match_end)| {
+                if cfg!(debug_assertions) {
+                    eprintln!(
+                        "Found {:?} at ({}) to ({})",
+                        self.regex.as_ref().unwrap(),
+                        match_start,
+                        match_end
+                    );
+                }
                 if ms != 0 {
-                    buf.set_mark_position(ms, ss_n + match_start as MintCount);
+                    buf.set_mark_position(ms, match_start as MintCount);
                 }
                 if me != 0 {
-                    buf.set_mark_position(me, ss_n + match_end as MintCount);
+                    buf.set_mark_position(me, match_end as MintCount);
                 }
                 true
             })
@@ -172,10 +196,10 @@ impl EmacsBuffers {
             .and_then(|re| buf.find_backward(re, ss_n as usize, se_n as usize))
             .map(|(match_start, match_end)| {
                 if ms != 0 {
-                    buf.set_mark_position(ms, ss_n + match_start as MintCount);
+                    buf.set_mark_position(ms, match_start as MintCount);
                 }
                 if me != 0 {
-                    buf.set_mark_position(me, ss_n + match_end as MintCount);
+                    buf.set_mark_position(me, match_end as MintCount);
                 }
                 true
             })

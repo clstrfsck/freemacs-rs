@@ -77,11 +77,6 @@ impl LibHdr {
 struct SlPrim;
 impl MintPrim for SlPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let file_name = args[1].value();
         let file_name_str = String::from_utf8_lossy(file_name);
 
@@ -96,34 +91,35 @@ impl MintPrim for SlPrim {
         };
 
         // Write each form (skip function name at index 0 and END marker at end)
-        for arg in args.iter().take(args.len() - 1).skip(2) {
-            let form_name = arg.value();
+        if args.len() > 2 {
+            for arg in args.iter().take(args.len() - 1).skip(2) {
+                let form_name = arg.value();
 
-            if let Some(form) = interp.get_form(form_name) {
-                let form_content = form.content();
-                let form_pos = form.get_pos();
+                if let Some(form) = interp.get_form(form_name) {
+                    let form_content = form.content();
+                    let form_pos = form.get_pos();
 
-                // Create header
-                let hdr = LibHdr {
-                    total_length: (LibHdr::SIZE + form_name.len() + form_content.len()) as u32,
-                    name_length: form_name.len() as u32,
-                    reserved: 0,
-                    form_pos,
-                    data_length: form_content.len() as u32,
-                };
+                    // Create header
+                    let hdr = LibHdr {
+                        total_length: (LibHdr::SIZE + form_name.len() + form_content.len()) as u32,
+                        name_length: form_name.len() as u32,
+                        reserved: 0,
+                        form_pos,
+                        data_length: form_content.len() as u32,
+                    };
 
-                // Write header, name, and content
-                if file.write_all(&hdr.to_bytes()).is_err()
-                    || file.write_all(form_name).is_err()
-                    || file.write_all(form_content).is_err()
-                {
-                    let error_msg = b"Write error".to_vec();
-                    interp.return_string(is_active, &error_msg);
-                    return;
+                    // Write header, name, and content
+                    if file.write_all(&hdr.to_bytes()).is_err()
+                        || file.write_all(form_name).is_err()
+                        || file.write_all(form_content).is_err()
+                    {
+                        let error_msg = b"Write error".to_vec();
+                        interp.return_string(is_active, &error_msg);
+                        return;
+                    }
                 }
             }
         }
-
         // Success - return null
         interp.return_null(is_active);
     }
@@ -138,11 +134,6 @@ impl MintPrim for SlPrim {
 struct LlPrim;
 impl MintPrim for LlPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            interp.return_null(is_active);
-            return;
-        }
-
         let file_name = args[1].value();
         let file_name_str = String::from_utf8_lossy(file_name);
 
@@ -191,7 +182,7 @@ impl MintPrim for LlPrim {
             offset += data_len;
 
             // Set the form in the interpreter
-            interp.set_form_value(form_name.clone(), form_value);
+            interp.set_form_value(&form_name, &form_value);
             interp.set_form_pos(&form_name, hdr.form_pos);
         }
 

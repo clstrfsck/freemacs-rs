@@ -18,6 +18,7 @@
 
 use crate::mint::{Mint, MintPrim};
 use crate::mint_arg::MintArgList;
+use crate::mint_types::MintString;
 
 // #(ds,X,Y)
 // ---------
@@ -28,12 +29,8 @@ use crate::mint_arg::MintArgList;
 struct DsPrim;
 impl MintPrim for DsPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
-        let form_name = args[1].value().clone();
-        let form_value = args[2].value().clone();
+        let form_name = args[1].value();
+        let form_value = args[2].value();
         interp.set_form_value(form_name, form_value);
         interp.return_null(is_active);
     }
@@ -50,28 +47,18 @@ impl MintPrim for DsPrim {
 struct GsPrim;
 impl MintPrim for GsPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            interp.return_null(is_active);
-            return;
-        }
-
-        // Get form name
         let form_name = args[1].value();
-
-        // Create new args list with parameters (skip function name and form name)
-        let param_args: MintArgList = if args.len() > 2 {
+        let new_args = if args.len() > 2 {
             args.iter().skip(2).cloned().collect()
         } else {
             MintArgList::default()
         };
-
-        // Get form and expand with parameters
-        if let Some(form) = interp.get_form(form_name) {
-            let content = form.get();
-            interp.return_seg_string(is_active, &content, &param_args);
+        let form = if let Some(f) = interp.get_form(form_name) {
+            f.get()
         } else {
-            interp.return_null(is_active);
-        }
+            MintString::new()
+        };
+        interp.return_seg_string(is_active, &form, &new_args);
     }
 }
 
@@ -87,10 +74,6 @@ impl MintPrim for GsPrim {
 struct GoPrim;
 impl MintPrim for GoPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
         let form_name = args[1].value();
         let error_string = args[2].value();
         interp.return_n_form(is_active, form_name, 1, error_string);
@@ -108,10 +91,6 @@ impl MintPrim for GoPrim {
 struct GnPrim;
 impl MintPrim for GnPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 4 {
-            return;
-        }
-
         let form_name = args[1].value();
         let count = args[2].get_int_value(10);
         let error_string = args[3].value();
@@ -127,10 +106,6 @@ impl MintPrim for GnPrim {
 struct RsPrim;
 impl MintPrim for RsPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            return;
-        }
-
         let form_name = args[1].value();
         interp.set_form_pos(form_name, 0);
         interp.return_null(is_active);
@@ -152,10 +127,6 @@ impl MintPrim for RsPrim {
 struct FmPrim;
 impl MintPrim for FmPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 4 {
-            return;
-        }
-
         let form_name = args[1].value();
         let search_str = args[2].value();
         let not_found_str = args[3].value();
@@ -196,21 +167,17 @@ impl MintPrim for FmPrim {
 struct NxPrim;
 impl MintPrim for NxPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 4 {
-            return;
-        }
-
         let form_name = args[1].value();
         let exists_str = args[2].value();
         let not_exists_str = args[3].value();
 
         let result = if interp.get_form(form_name).is_some() {
-            exists_str.clone()
+            exists_str
         } else {
-            not_exists_str.clone()
+            not_exists_str
         };
 
-        interp.return_string(is_active, &result);
+        interp.return_string(is_active, result);
     }
 }
 
@@ -258,10 +225,6 @@ impl MintPrim for EsPrim {
 struct MpPrim;
 impl MintPrim for MpPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
         let form_name = args[1].value();
 
         if let Some(form) = interp.get_form(form_name) {
@@ -289,7 +252,7 @@ impl MintPrim for MpPrim {
                 param_marker += 1;
             }
 
-            interp.set_form_value(form_name.clone(), form_value);
+            interp.set_form_value(form_name, &form_value);
         }
 
         interp.return_null(is_active);
@@ -308,24 +271,18 @@ impl MintPrim for MpPrim {
 struct HkPrim;
 impl MintPrim for HkPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            interp.return_null(is_active);
-            return;
-        }
-
-        // Search for first existing form (skip function name and END marker)
-        for i in 1..args.len() - 1 {
-            let form_name = args[i].value();
-
-            if let Some(form) = interp.get_form(form_name) {
-                // Found a form - expand it with remaining args as parameters
-                let content = form.content().clone();
-                let param_args: MintArgList = args.iter().skip(i + 1).cloned().collect();
-                interp.return_seg_string(is_active, &content, &param_args);
-                return;
+        if args.len() > 2 {
+            // Search for first existing form (skip function name and END marker)
+            for i in 1..args.len() - 1 {
+                if let Some(form) = interp.get_form(args[i].value()) {
+                    // Found a form - expand it with args as parameters
+                    let content = form.content().clone();
+                    let param_args: MintArgList = args.iter().skip(i).cloned().collect();
+                    interp.return_seg_string(is_active, &content, &param_args);
+                    return;
+                }
             }
         }
-
         // No form found
         interp.return_null(is_active);
     }

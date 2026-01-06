@@ -132,5 +132,4 @@ fn test_integration() {
     ));
 
     interp.result();
-    assert!(false);
 }

@@ -216,23 +216,35 @@ impl Mint {
     }
 
     pub fn get_var(&self, var_name: &MintString) -> MintString {
-        self.vars
+        let var = self.vars
             .get(var_name)
-            .map(|v| v.get_val(self))
-            .unwrap_or_default()
+            .map(|v| v.get_val(self));
+        if cfg!(debug_assertions) {
+            if var.is_none() {
+                eprintln!("Can't find variable '{:?}' while reading", String::from_utf8_lossy(var_name));
+            }
+        }
+        var.unwrap_or_default()
     }
 
     pub fn set_var(&mut self, var_name: &MintString, val: &MintString) {
         if let Some(var) = self.vars.get(var_name).cloned() {
             var.set_val(self, val);
+        } else if cfg!(debug_assertions) {
+            eprintln!("Can't find variable '{:?}' while writing", String::from_utf8_lossy(var_name));
         }
     }
 
     pub fn return_null(&self, _is_active: bool) {
-        // No-op in release builds
+        if cfg!(debug_assertions) {
+            eprintln!("** Function ({}) returned null string", if _is_active { "A" } else { "N" });
+        }
     }
 
     pub fn return_string(&mut self, is_active: bool, s: &MintString) {
+        if cfg!(debug_assertions) {
+            eprintln!("** Function ({}) returned: {}", if is_active { "A" } else { "N" }, String::from_utf8_lossy(s));
+        }
         if is_active {
             self.active_string.push_front(s);
         } else {
@@ -333,8 +345,8 @@ impl Mint {
         self.forms.remove(form_name);
     }
 
-    pub fn set_form_value(&mut self, form_name: MintString, value: MintString) {
-        self.forms.insert(form_name, MintForm::from_string(value));
+    pub fn set_form_value(&mut self, form_name: &MintString, value: &MintString) {
+        self.forms.insert(form_name.clone(), MintForm::from_string(value));
     }
 
     pub fn scan(&mut self) {
@@ -445,19 +457,34 @@ impl Mint {
         let func_name = args[0].value().clone();
 
         if self.prims.contains_key(&func_name) {
-            let prim = self.prims.remove(&func_name).unwrap();
+            if cfg!(debug_assertions) {
+                eprintln!("Execute function: {} with {} arguments", String::from_utf8_lossy(&func_name), args.len() - 1);
+                for (argn, arg) in args.iter().enumerate().skip(1) {
+                    eprintln!("  Arg {} ({}): {}", argn, arg.arg_type() as u8, String::from_utf8_lossy(&arg.value()));
+                }
+            }
+            let prim = self.prims.get(&func_name).unwrap().clone();
             prim.execute(self, is_active, &args);
-            self.prims.insert(func_name.clone(), prim);
         } else {
             let form_name = if self.forms.contains_key(&func_name) {
-                func_name
+                &func_name
             } else if is_active {
-                b"dflta".to_vec()
+                &b"dflta".to_vec()
             } else {
-                b"dfltn".to_vec()
+                &b"dfltn".to_vec()
             };
 
-            if let Some(form) = self.forms.get(&form_name) {
+            if cfg!(debug_assertions) {
+                eprintln!(
+                    "Execute function: {} with {} arguments",
+                    String::from_utf8_lossy(&func_name),
+                     args.len() - 1
+                );
+                for (argn, arg) in args.iter().enumerate().skip(1) {
+                    eprintln!("  Arg {} ({}): {}", argn, arg.arg_type() as u8, String::from_utf8_lossy(&arg.value()));
+                }
+            }
+            if let Some(form) = self.forms.get(form_name) {
                 let pos = form.get_pos();
                 let content = form.content()[pos as usize..].to_vec();
                 self.return_seg_string(is_active, &content, &args);

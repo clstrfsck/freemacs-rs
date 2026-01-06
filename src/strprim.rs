@@ -28,20 +28,16 @@ use crate::mint_arg::MintArgList;
 struct EqPrim;
 impl MintPrim for EqPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 5 {
-            return;
-        }
-
         let a1 = args[1].value();
         let a2 = args[2].value();
 
         let result = if a1 == a2 {
-            args[3].value().clone()
+            args[3].value()
         } else {
-            args[4].value().clone()
+            args[4].value()
         };
 
-        interp.return_string(is_active, &result);
+        interp.return_string(is_active, result);
     }
 }
 
@@ -53,20 +49,16 @@ impl MintPrim for EqPrim {
 struct NePrim;
 impl MintPrim for NePrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 5 {
-            return;
-        }
-
         let a1 = args[1].value();
         let a2 = args[2].value();
 
         let result = if a1 != a2 {
-            args[3].value().clone()
+            args[3].value()
         } else {
-            args[4].value().clone()
+            args[4].value()
         };
 
-        interp.return_string(is_active, &result);
+        interp.return_string(is_active, result);
     }
 }
 
@@ -78,11 +70,6 @@ impl MintPrim for NePrim {
 struct NcPrim;
 impl MintPrim for NcPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 2 {
-            interp.return_integer(is_active, 0, 10);
-            return;
-        }
-
         let s = args[1].value();
         interp.return_integer(is_active, s.len() as i32, 10);
     }
@@ -92,17 +79,11 @@ impl MintPrim for NcPrim {
 // -------------
 // Alphabetically ordered.
 //
-// Returns: "A" if "X" is lexicographically less that "Y", otherwise
-// returns "B".
+// Returns: "A" if "X" is lexicographically less than or equal to "Y",
+// otherwise returns "B".
 struct AoPrim;
 impl MintPrim for AoPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        // FIXME: This is not the right behavior when there are
-        // too few arguments.
-        if args.len() < 5 {
-            return;
-        }
-
         let a1 = args[1].value();
         let a2 = args[2].value();
 
@@ -125,15 +106,14 @@ impl MintPrim for AoPrim {
 struct SaPrim;
 impl MintPrim for SaPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        // FIXME: This could be more efficient.
-        // FIXME: This returns the wrong thing when args.len() < 2
         let mut result = Vec::new();
 
         if args.len() > 2 {
-            // Collect all arguments (skip first which is function name and last which is END)
-            let mut items: Vec<Vec<u8>> = Vec::new();
+            // Collect all arguments
+            // skip first which is function name and last which is END
+            let mut items: Vec<&[u8]> = Vec::new();
             for arg in args.iter().take(args.len() - 1).skip(1) {
-                items.push(arg.value().clone());
+                items.push(arg.value());
             }
 
             // Sort lexicographically
@@ -141,11 +121,11 @@ impl MintPrim for SaPrim {
 
             // Join with commas
             if !items.is_empty() {
-                result.extend_from_slice(&items[0]);
-                for item in &items[1..] {
+                result.extend_from_slice(items[0]);
+                items.iter().skip(1).for_each(|item| {
                     result.push(b',');
                     result.extend_from_slice(item);
-                }
+                });
             }
         }
 
@@ -166,10 +146,6 @@ impl MintPrim for SaPrim {
 struct SiPrim;
 impl MintPrim for SiPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
         let form_name = args[1].value();
         let orig = args[2].value();
         let form_opt = interp.get_form(form_name);

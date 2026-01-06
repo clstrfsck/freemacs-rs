@@ -86,10 +86,6 @@ struct BinaryOpPrim<T: BinaryOp> {
 
 impl<T: BinaryOp> MintPrim for BinaryOpPrim<T> {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 3 {
-            return;
-        }
-
         let a1 = args[1].get_int_value(10);
         let prefix = args[1].get_int_prefix(10);
 
@@ -166,10 +162,6 @@ impl BinaryOp for XorOp {
 struct GtPrim;
 impl MintPrim for GtPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, args: &MintArgList) {
-        if args.len() < 5 {
-            return;
-        }
-
         let a1 = args[1].get_int_value(10);
         let a2 = args[2].get_int_value(10);
 
