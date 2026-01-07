@@ -74,14 +74,14 @@ impl ActiveString {
 }
 
 struct NeutralString {
-    args: Vec<MintArg>,
+    args: VecDeque<MintArg>,
     last_func: usize,
 }
 
 impl NeutralString {
     fn new() -> Self {
         let mut ns = Self {
-            args: Vec::new(),
+            args: VecDeque::new(),
             last_func: 0,
         };
         ns.clear();
@@ -90,39 +90,39 @@ impl NeutralString {
 
     fn clear(&mut self) {
         self.args.clear();
-        self.args.push(MintArg::new(ArgType::Null));
+        self.args.push_back(MintArg::new(ArgType::Null));
         self.save_func();
     }
 
     fn append(&mut self, ch: MintChar) {
-        if let Some(arg) = self.args.first_mut() {
+        if let Some(arg) = self.args.front_mut() {
             arg.append(ch);
         }
     }
 
     fn append_slice(&mut self, s: &[MintChar]) {
-        if let Some(arg) = self.args.first_mut() {
+        if let Some(arg) = self.args.front_mut() {
             arg.append_slice(s);
         }
     }
 
     fn mark_argument(&mut self) {
-        self.args.insert(0, MintArg::new(ArgType::Arg));
+        self.args.push_front(MintArg::new(ArgType::Arg));
         self.increment_last_func();
     }
 
     fn mark_active_function(&mut self) {
-        self.args.insert(0, MintArg::new(ArgType::Active));
+        self.args.push_front(MintArg::new(ArgType::Active));
         self.save_func();
     }
 
     fn mark_neutral_function(&mut self) {
-        self.args.insert(0, MintArg::new(ArgType::Neutral));
+        self.args.push_front(MintArg::new(ArgType::Neutral));
         self.save_func();
     }
 
     fn mark_end_function(&mut self) {
-        self.args.insert(0, MintArg::new(ArgType::End));
+        self.args.push_front(MintArg::new(ArgType::End));
         self.increment_last_func();
     }
 
@@ -135,14 +135,13 @@ impl NeutralString {
     }
 
     fn pop_arguments(&mut self) -> MintArgList {
-        // FIXME: This is pretty messy.  Instead of cloning and draining, we
-        // could just split_off the args Vec at last_func.
+        let at = self.last_func.min(self.args.len());
         let mut result = MintArgList::new();
-        for i in 0..self.last_func {
-            result.push_front(self.args[i].clone());
+        for _ in 0..at {
+            if let Some(arg) = self.args.pop_front() {
+                result.push_front(arg);
+            }
         }
-
-        self.args.drain(0..self.last_func);
 
         if self.args.is_empty() {
             self.clear();
@@ -178,17 +177,20 @@ impl Default for Mint {
     }
 }
 
+const DEFAULT_STRING_KEY: &[MintChar] = b"#(d,#(g))";
+const DEFAULT_STRING_NO_KEY: &[MintChar] = b"#(k)#(d,#(g))";
+const DFLTA: &[MintChar] = b"dflta";
+const DFLTN: &[MintChar] = b"dfltn";
+
 impl Mint {
     pub fn new() -> Self {
-        let default_string_key = b"#(d,#(g))".to_vec();
-        let default_string_nokey = b"#(k)#(d,#(g))".to_vec();
 
         let mut mint = Self {
             idle_max: 0,
             idle_count: 0,
             idle_string: Vec::new(),
-            default_string_key,
-            default_string_nokey: default_string_nokey.clone(),
+            default_string_key: DEFAULT_STRING_KEY.to_vec(),
+            default_string_nokey: DEFAULT_STRING_NO_KEY.to_vec(),
             active_string: ActiveString::new(),
             neutral_string: NeutralString::new(),
             forms: HashMap::new(),
@@ -196,7 +198,7 @@ impl Mint {
             prims: HashMap::new(),
         };
 
-        mint.active_string.push_front(&default_string_nokey);
+        mint.active_string.push_front(DEFAULT_STRING_NO_KEY);
         mint
     }
 
@@ -463,13 +465,13 @@ impl Mint {
         }
 
         let is_active = args[0].arg_type() == ArgType::Active;
-        let func_name = args[0].value().clone();
+        let func_name = args[0].value();
 
-        if self.prims.contains_key(&func_name) {
+        if let Some(prim) = self.prims.get(func_name) {
             if cfg!(debug_assertions) {
                 eprintln!(
                     "Execute function: {} with {} arguments",
-                    String::from_utf8_lossy(&func_name),
+                    String::from_utf8_lossy(func_name),
                     args.len() - 1
                 );
                 for (argn, arg) in args.iter().enumerate().skip(1) {
@@ -481,33 +483,14 @@ impl Mint {
                     );
                 }
             }
-            let prim = self.prims.get(&func_name).unwrap().clone();
-            prim.execute(self, is_active, &args);
+            prim.clone().execute(self, is_active, &args);
+        } else if let Some(form) = self.forms.get(func_name) {
+            let pos = form.get_pos();
+            let content = form.content()[pos as usize..].to_vec();
+            self.return_seg_string(is_active, &content, &args);
         } else {
-            let form_name = if self.forms.contains_key(&func_name) {
-                &func_name
-            } else if is_active {
-                &b"dflta".to_vec()
-            } else {
-                &b"dfltn".to_vec()
-            };
-
-            if cfg!(debug_assertions) {
-                eprintln!(
-                    "Execute function: {} with {} arguments",
-                    String::from_utf8_lossy(&func_name),
-                    args.len() - 1
-                );
-                for (argn, arg) in args.iter().enumerate().skip(1) {
-                    eprintln!(
-                        "  Arg {} ({}): {}",
-                        argn,
-                        arg.arg_type() as u8,
-                        String::from_utf8_lossy(arg.value())
-                    );
-                }
-            }
-            if let Some(form) = self.forms.get(form_name) {
+            let default_name: &[MintChar] = if is_active { DFLTA } else { DFLTN };
+            if let Some(form) = self.forms.get(default_name) {
                 let pos = form.get_pos();
                 let content = form.content()[pos as usize..].to_vec();
                 self.return_seg_string(is_active, &content, &args);
@@ -518,14 +501,14 @@ impl Mint {
     }
 
     pub fn return_seg_string(&mut self, is_active: bool, ss: &MintString, args: &MintArgList) {
-        let arg_vec: Vec<&MintString> = args.iter().map(|a| a.value()).collect();
-        let last_index = arg_vec.len().saturating_sub(1);
+        let last_index = args.len().saturating_sub(1);
+        let get_arg = |index: usize| args[index].value();
 
         if is_active {
             for &ch in ss.iter().rev() {
                 if ch >= 0x80 {
                     let index = (ch - 0x80).min(last_index as u8) as usize;
-                    self.active_string.push_front(arg_vec[index]);
+                    self.active_string.push_front(get_arg(index));
                 } else {
                     self.active_string.push_front_char(ch);
                 }
@@ -534,7 +517,7 @@ impl Mint {
             for &ch in ss.iter() {
                 if ch >= 0x80 {
                     let index = (ch - 0x80).min(last_index as u8) as usize;
-                    self.neutral_string.append_slice(arg_vec[index]);
+                    self.neutral_string.append_slice(get_arg(index));
                 } else {
                     self.neutral_string.append(ch);
                 }
