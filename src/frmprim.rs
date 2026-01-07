@@ -301,3 +301,57 @@ pub fn register_frm_prims(interp: &mut Mint) {
     interp.add_prim(b"mp".to_vec(), Box::new(MpPrim));
     interp.add_prim(b"hk".to_vec(), Box::new(HkPrim));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mint_arg::{ArgType, MintArg, MintArgList};
+
+    fn arg_with_bytes(t: ArgType, value: &str) -> MintArg {
+        let mut a = MintArg::new(t);
+        a.append_slice(value.as_bytes());
+        a
+    }
+
+    fn build_args(fn_name: &str, args: &[&str], fn_type: ArgType) -> MintArgList {
+        let mut al = MintArgList::new();
+        al.push_front(MintArg::new(ArgType::End));
+        for &a in args.iter().rev() {
+            al.push_front(arg_with_bytes(ArgType::Arg, a));
+        }
+        al.push_front(arg_with_bytes(fn_type, fn_name));
+        al
+    }
+
+    #[test]
+    fn ds_sets_form_value() {
+        let mut mint = Mint::new();
+        register_frm_prims(&mut mint);
+
+        // call #(ds, "m", "value")
+        let args = build_args("ds", &["m", "value"], ArgType::Neutral);
+
+        // call the primitive directly (unit test in same module can access private prims map)
+        let prim = mint.get_prim(b"ds").unwrap().clone();
+        prim.execute(&mut mint, false, &args);
+
+        // check the form was stored
+        let form = mint.get_form(&b"m".to_vec());
+        assert!(form.is_some());
+        assert_eq!(form.unwrap().content(), &b"value".to_vec());
+    }
+
+    #[test]
+    fn gs_returns_form_with_params() {
+        let mut mint = Mint::new();
+        register_frm_prims(&mut mint);
+
+        mint.set_form_value(&b"f".to_vec(), &b"\x80".to_vec());
+
+        let args = build_args("gs", &["f", "X"], ArgType::Neutral);
+        let prim = mint.get_prim(b"gs").unwrap().clone();
+        prim.execute(&mut mint, false, &args);
+
+        assert!(mint.get_form(b"f").is_some());
+    }
+}

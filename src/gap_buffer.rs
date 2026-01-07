@@ -17,7 +17,7 @@
  */
 
 use crate::buffer::Buffer;
-use crate::mint_types::{MintChar, MintCount, MintString};
+use crate::mint_types::{MintChar, MintCount};
 use regex::bytes::Regex;
 use std::borrow::Cow;
 use std::ops::Range;
@@ -146,7 +146,7 @@ impl Buffer for GapBuffer {
         Some(self.buffer[actual_offset as usize])
     }
 
-    fn replace(&mut self, offset: MintCount, n: MintCount, replacement: &MintString) -> bool {
+    fn replace(&mut self, offset: MintCount, n: MintCount, replacement: &[MintChar]) -> bool {
         self.erase(offset, n) && self.insert(offset, replacement)
     }
 
@@ -159,7 +159,7 @@ impl Buffer for GapBuffer {
         }
     }
 
-    fn insert(&mut self, offset: MintCount, to_insert: &MintString) -> bool {
+    fn insert(&mut self, offset: MintCount, to_insert: &[MintChar]) -> bool {
         let insert_size = to_insert.len();
         if (self.free() as usize) < insert_size {
             self.expand(insert_size as MintCount - self.free());
@@ -208,6 +208,7 @@ impl Buffer for GapBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mint_types::MintString;
 
     fn to_ms(s: &str) -> Vec<u8> {
         s.bytes().collect()

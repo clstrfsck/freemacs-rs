@@ -16,7 +16,7 @@
  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  */
 
-use crate::mint_types::{MintCount, MintString};
+use crate::mint_types::{MintChar, MintCount, MintString};
 use std::cmp::min;
 
 #[derive(Debug, Clone)]
@@ -26,9 +26,9 @@ pub struct MintForm {
 }
 
 impl MintForm {
-    pub fn from_string(s: &MintString) -> Self {
+    pub fn from_string(s: &[MintChar]) -> Self {
         Self {
-            content: s.clone(),
+            content: s.to_vec(),
             index: 0,
         }
     }

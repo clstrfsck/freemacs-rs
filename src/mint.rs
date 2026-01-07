@@ -178,19 +178,18 @@ impl Default for Mint {
 }
 
 const DEFAULT_STRING_KEY: &[MintChar] = b"#(d,#(g))";
-const DEFAULT_STRING_NO_KEY: &[MintChar] = b"#(k)#(d,#(g))";
+const DEFAULT_STRING_NOKEY: &[MintChar] = b"#(k)#(d,#(g))";
 const DFLTA: &[MintChar] = b"dflta";
 const DFLTN: &[MintChar] = b"dfltn";
 
 impl Mint {
     pub fn new() -> Self {
-
         let mut mint = Self {
             idle_max: 0,
             idle_count: 0,
             idle_string: Vec::new(),
             default_string_key: DEFAULT_STRING_KEY.to_vec(),
-            default_string_nokey: DEFAULT_STRING_NO_KEY.to_vec(),
+            default_string_nokey: DEFAULT_STRING_NOKEY.to_vec(),
             active_string: ActiveString::new(),
             neutral_string: NeutralString::new(),
             forms: HashMap::new(),
@@ -198,7 +197,7 @@ impl Mint {
             prims: HashMap::new(),
         };
 
-        mint.active_string.push_front(DEFAULT_STRING_NO_KEY);
+        mint.active_string.push_front(DEFAULT_STRING_NOKEY);
         mint
     }
 
@@ -237,6 +236,10 @@ impl Mint {
                 String::from_utf8_lossy(var_name)
             );
         }
+    }
+
+    pub fn get_prim(&self, prim_name: &[MintChar]) -> Option<Rc<Box<dyn MintPrim>>> {
+        self.prims.get(prim_name).cloned()
     }
 
     pub fn return_null(&self, _is_active: bool) {
@@ -343,21 +346,21 @@ impl Mint {
         }
     }
 
-    pub fn get_form(&self, form_name: &MintString) -> Option<&MintForm> {
+    pub fn get_form(&self, form_name: &[MintChar]) -> Option<&MintForm> {
         self.forms.get(form_name)
     }
 
-    pub fn get_form_mut(&mut self, form_name: &MintString) -> Option<&mut MintForm> {
+    pub fn get_form_mut(&mut self, form_name: &[MintChar]) -> Option<&mut MintForm> {
         self.forms.get_mut(form_name)
     }
 
-    pub fn del_form(&mut self, form_name: &MintString) {
+    pub fn del_form(&mut self, form_name: &[MintChar]) {
         self.forms.remove(form_name);
     }
 
-    pub fn set_form_value(&mut self, form_name: &MintString, value: &MintString) {
+    pub fn set_form_value(&mut self, form_name: &[MintChar], value: &[MintChar]) {
         self.forms
-            .insert(form_name.clone(), MintForm::from_string(value));
+            .insert(form_name.to_vec(), MintForm::from_string(value));
     }
 
     pub fn scan(&mut self) {
@@ -381,14 +384,35 @@ impl Mint {
             let ch = self.active_string.data[pos];
             match ch {
                 b'\t' | b'\r' | b'\n' => {
+                    /*
+                    3. If the character under the scan pointer is a horizontal
+                    tab, carriage return, or line feed, delete it, advance the
+                    scan pointer, and return to step 2.
+                    */
                     pos += 1;
                 }
                 b'(' => {
+                    /*
+                    4. If the character under the scan pointer is a left
+                    parenthesis, delete it and scan forward until the matching
+                    right parenthesis is found. After all of the intervening
+                    characters have been moved without change to the neutral
+                    string, the right parenthesis deleted, and the scan pointer
+                    moved to the character following the right parenthesis,
+                    return to step 2.  If the matching right parenthesis cannot
+                    be found, go back to step 1 without giving an error.
+                    */
                     if !self.copy_to_close_paren(&mut pos) {
                         return;
                     }
                 }
                 b',' => {
+                    /*
+                    5. If the character under the scan pointer is a comma, delete
+                    it, mark the rightmost character of the neutral string as
+                    the end of one argument, advance the scan pointer, and
+                    return to step 2.
+                    */
                     pos += 1;
                     self.neutral_string.mark_argument();
                 }
@@ -396,20 +420,67 @@ impl Mint {
                     if pos + 1 < self.active_string.data.len()
                         && self.active_string.data[pos + 1] == b'('
                     {
+                        /*
+                        6. If the character under the scan pointer is a sharp sign
+                        and the next character is a left parenthesis, an active
+                        function is beginning.  Delete the sharp sign and the
+                        left parenthesis, advance the scan pointer beyond them,
+                        mark the rightmost character of the neutral string as
+                        the beginning of both an argument and an active
+                        function, and return to step 2.
+                        */
                         pos += 2;
                         self.neutral_string.mark_active_function();
                     } else if pos + 2 < self.active_string.data.len()
                         && self.active_string.data[pos + 1] == b'#'
                         && self.active_string.data[pos + 2] == b'('
                     {
+                        /*
+                        7. If the character under the scan pointer is a sharp
+                        sign and the next two characters are another sharp
+                        sign and a left parenthesis, a neutral function is
+                        beginning.  Delete the triple ##(, advance the scan
+                        pointer beyond them, mark the rightmost character
+                        of the neutral string as the beginning of both an
+                        argument and a neutral function, and return to step
+                        2.
+                        */
                         pos += 3;
                         self.neutral_string.mark_neutral_function();
                     } else {
+                        /*
+                        8. If the character under the scan pointer is a sharp sign
+                        that did not meet the conditions of step 6 or 7, move
+                        it to the right end of the neutral string, advance the
+                        scan pointer, and return to step 2.
+                        */
                         self.neutral_string.append(b'#');
                         pos += 1;
                     }
                 }
                 b')' => {
+                    /*
+                    9. If the character under the scan pointer is a right parenthesis, a
+                    function is ending.  Delete the right parenthesis, advance the scan
+                    pointer, and mark the rightmost character of the neutral string as the
+                    end of an argument and the end of a function.  Now the neutral string
+                    from the rightmost begin function marker to the just inserted end
+                    function marker constitutes a MINT function invocation.  (If there is
+                    no begin function marker in the neutral string, return to step 1
+                    without giving an error.)  The first argument is assumed to be the
+                    name of a MINT function.  If the argument is two characters long, and
+                    is the name of a built-in function, that function is evaluated with
+                    the given arguments: extra arguments are ignored and missing ones are
+                    automatically supplied as the null string.  If the function is not
+                    built-in, a default built-in function is executed.  The result
+                    of the function is catenated to the right of the neutral string if the
+                    function was marked as neutral and to the left of the active string if
+                    marked active; in the latter case, the scan pointer is reset to the
+                    leftmost character of the new active string.  Check the head of the
+                    keyboard buffer.  If the key is the break key for your system (Z-100
+                    uses Shift-Help, IBM-PC uses Ctrl-Break) then input that key and go
+                    to step one, otherwise return to step 2.
+                    */
                     pos += 1;
                     self.active_string.drain(0..pos);
                     if !self.execute_function() {
@@ -418,6 +489,12 @@ impl Mint {
                     pos = 0;
                 }
                 _ => {
+                    /*
+                    10. If the character under the scan pointer did not meet any
+                    of the conditions of steps 3 through 9, attach it to the
+                    right of the neutral string, delete it from the active
+                    string, advance the scan pointer, and return to step 2.
+                    */
                     self.neutral_string.append(ch);
                     pos += 1;
                 }
@@ -467,23 +544,8 @@ impl Mint {
         let is_active = args[0].arg_type() == ArgType::Active;
         let func_name = args[0].value();
 
-        if let Some(prim) = self.prims.get(func_name) {
-            if cfg!(debug_assertions) {
-                eprintln!(
-                    "Execute function: {} with {} arguments",
-                    String::from_utf8_lossy(func_name),
-                    args.len() - 1
-                );
-                for (argn, arg) in args.iter().enumerate().skip(1) {
-                    eprintln!(
-                        "  Arg {} ({}): {}",
-                        argn,
-                        arg.arg_type() as u8,
-                        String::from_utf8_lossy(arg.value())
-                    );
-                }
-            }
-            prim.clone().execute(self, is_active, &args);
+        if let Some(prim) = self.get_prim(func_name) {
+            prim.execute(self, is_active, &args);
         } else if let Some(form) = self.forms.get(func_name) {
             let pos = form.get_pos();
             let content = form.content()[pos as usize..].to_vec();
@@ -501,14 +563,11 @@ impl Mint {
     }
 
     pub fn return_seg_string(&mut self, is_active: bool, ss: &MintString, args: &MintArgList) {
-        let last_index = args.len().saturating_sub(1);
-        let get_arg = |index: usize| args[index].value();
-
         if is_active {
             for &ch in ss.iter().rev() {
                 if ch >= 0x80 {
-                    let index = (ch - 0x80).min(last_index as u8) as usize;
-                    self.active_string.push_front(get_arg(index));
+                    let index = (ch - 0x80) as usize;
+                    self.active_string.push_front(args[index].value());
                 } else {
                     self.active_string.push_front_char(ch);
                 }
@@ -516,8 +575,8 @@ impl Mint {
         } else {
             for &ch in ss.iter() {
                 if ch >= 0x80 {
-                    let index = (ch - 0x80).min(last_index as u8) as usize;
-                    self.neutral_string.append_slice(get_arg(index));
+                    let index = (ch - 0x80) as usize;
+                    self.neutral_string.append_slice(args[index].value());
                 } else {
                     self.neutral_string.append(ch);
                 }
