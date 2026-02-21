@@ -19,7 +19,6 @@
 use freemacs::buffer;
 use freemacs::emacs_buffers;
 use freemacs::emacs_window;
-use freemacs::emacs_window_curses;
 use freemacs::gap_buffer;
 use freemacs::mint;
 
@@ -91,14 +90,26 @@ Press any key to exit...))\
 \t))\
 ))";
 
+fn new_window() -> Box<dyn emacs_window::EmacsWindow> {
+    #[cfg(feature = "crossterm")]
+    {
+        use freemacs::emacs_window_crossterm;
+        Box::new(emacs_window_crossterm::EmacsWindowCrossterm::new())
+    }
+    #[cfg(not(feature = "crossterm"))]
+    {
+        use freemacs::emacs_window_curses;
+        Box::new(emacs_window_curses::EmacsWindowCurses::new())
+    }
+}
+
 fn gap_buffer_factory() -> Box<dyn buffer::Buffer> {
     Box::new(gap_buffer::GapBuffer::with_default_size())
 }
 
 fn main() {
     emacs_buffers::init_buffers(gap_buffer_factory);
-    let w = Box::new(emacs_window_curses::EmacsWindowCurses::new());
-    emacs_window::init_window(w);
+    emacs_window::init_window(new_window());
 
     let args: Vec<String> = env::args().collect();
     let envp: Vec<(String, String)> = env::vars().collect();

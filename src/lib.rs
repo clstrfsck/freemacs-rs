@@ -22,6 +22,7 @@ pub mod bufprim;
 pub mod emacs_buffer;
 pub mod emacs_buffers;
 pub mod emacs_window;
+pub mod emacs_window_crossterm;
 pub mod emacs_window_curses;
 pub mod emacs_window_debug;
 pub mod frmprim;
