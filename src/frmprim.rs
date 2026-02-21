@@ -336,9 +336,9 @@ mod tests {
         prim.execute(&mut mint, false, &args);
 
         // check the form was stored
-        let form = mint.get_form(&b"m".to_vec());
+        let form = mint.get_form(b"m".as_ref());
         assert!(form.is_some());
-        assert_eq!(form.unwrap().content(), &b"value".to_vec());
+        assert_eq!(form.unwrap().content(), b"value".as_ref());
     }
 
     #[test]
@@ -346,7 +346,7 @@ mod tests {
         let mut mint = Mint::new();
         register_frm_prims(&mut mint);
 
-        mint.set_form_value(&b"f".to_vec(), &b"\x80".to_vec());
+        mint.set_form_value(b"f".as_ref(), b"\x80".as_ref());
 
         let args = build_args("gs", &["f", "X"], ArgType::Neutral);
         let prim = mint.get_prim(b"gs").unwrap().clone();

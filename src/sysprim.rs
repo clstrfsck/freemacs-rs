@@ -244,27 +244,27 @@ const ENV_RUNLINE: &[u8] = b"env.RUNLINE";
 impl MintPrim for EvPrim {
     fn execute(&self, interp: &mut Mint, is_active: bool, _args: &MintArgList) {
         // Set switch character
-        interp.set_form_value(&ENV_SWITCHAR.to_vec(), &SWITCHAR.to_vec());
+        interp.set_form_value(ENV_SWITCHAR, SWITCHAR);
 
         // Set screen (empty - not available)
-        interp.set_form_value(&ENV_SCREEN.to_vec(), &Vec::new());
+        interp.set_form_value(ENV_SCREEN, &Vec::new());
 
         // Set full path and run line
         if !self.argv.is_empty() {
-            interp.set_form_value(&ENV_FULLPATH.to_vec(), &self.argv[0].as_bytes().to_vec());
+            interp.set_form_value(ENV_FULLPATH, self.argv[0].as_bytes());
             let mut runline = Vec::new();
             for arg in self.argv.iter().skip(1) {
                 runline.extend_from_slice(arg.as_bytes());
                 runline.push(b' ');
             }
-            interp.set_form_value(&ENV_RUNLINE.to_vec(), &runline);
+            interp.set_form_value(ENV_RUNLINE, &runline);
         }
 
         // Set environment variables
         for (key, value) in &self.envp {
             let mut form_name = b"env.".to_vec();
             form_name.extend_from_slice(key.as_bytes());
-            interp.set_form_value(&form_name, &value.as_bytes().to_vec());
+            interp.set_form_value(&form_name, value.as_bytes());
         }
 
         interp.return_null(is_active);
