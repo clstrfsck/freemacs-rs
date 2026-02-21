@@ -1,3 +1,6 @@
 /target
 /build
 /cpp
+/Editor/*.tmp
+/Editor/*.ed
+/Editor/*.edd

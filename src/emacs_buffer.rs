@@ -358,14 +358,23 @@ impl EmacsBuffer {
     }
 
     pub fn set_point_line(&mut self, lno: MintCount) {
-        if lno <= self.point_line {
-            let lines_back = self.point_line - lno;
-            self.point = self.backward_lines(self.point, lines_back);
-        } else {
-            let lines_forward = lno - self.point_line;
-            self.point = self.forward_lines(self.point, lines_forward);
+        if lno > self.point_line {
+            if lno >= self.count_newlines {
+                self.point_line = self.count_newlines;
+                self.point = self.get_mark_position_from(MARK_BOL, self.text.size() as MintCount);
+            } else {
+                self.point = self.forward_lines(self.point, lno - self.point_line);
+                self.point_line = lno;
+            }
+        } else if lno < self.point_line {
+            if lno == 0 {
+                self.point_line = 0;
+                self.point = 0;
+            } else {
+                self.point = self.backward_lines(self.point, self.point_line - lno);
+                self.point_line = lno;
+            }
         }
-        self.point_line = lno;
     }
 
     pub fn get_column(&self) -> MintCount {
@@ -470,7 +479,7 @@ impl EmacsBuffer {
             self.topline_line = 0;
         } else {
             self.topline = self.backward_lines(self.get_mark_position(MARK_BOL), li);
-            self.topline_line = self.count_newlines(self.get_mark_position(MARK_BOL), self.topline);
+            self.topline_line = self.count_newlines(self.get_mark_position(MARK_BOB), self.topline);
         }
     }
 
