@@ -477,15 +477,30 @@ impl Drop for EmacsWindowCrossterm {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Map a 0-15 DOS/ANSI colour index to a crossterm `Color`.
+/// Map a 0-15 DOS colour index to a crossterm `Color`.
 ///
 /// The low 3 bits select the hue (matching the classic CGA/EGA colour order),
 /// and bit 3 selects bright/bold versus dark.
 fn ansi_colour(colour: i32) -> Color {
-    // Crossterm's `Color::AnsiValue` maps exactly to the standard 16-colour
-    // ANSI palette (indices 0-15), so we can pass the value through directly
-    // after clamping to the valid range.
-    Color::AnsiValue((colour & 0x0F) as u8)
+    let colour_masked = colour & 0x0F;
+    match colour_masked {
+        0 => Color::Black,
+        1 => Color::DarkBlue,
+        2 => Color::DarkGreen,
+        3 => Color::DarkCyan,
+        4 => Color::DarkRed,
+        5 => Color::DarkMagenta,
+        6 => Color::DarkYellow,
+        7 => Color::Grey,
+        8 => Color::DarkGrey,
+        9 => Color::Blue,
+        10 => Color::Green,
+        11 => Color::Cyan,
+        12 => Color::Red,
+        13 => Color::Magenta,
+        14 => Color::Yellow,
+        _ => Color::White, // Masking means this is the only remaining case
+    }
 }
 
 /// Translate a crossterm `KeyEvent` into the `MintString` token that the
